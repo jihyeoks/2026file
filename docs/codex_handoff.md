@@ -40,13 +40,13 @@ If working on another computer, copy or relink these papers as needed.
 The planned simulation flow is:
 
 ```text
-adjacency matrix Gamma
+adjacency matrix Adj
     -> graph visualization
     -> initial Gaussian covariance V0
-    -> CV CZ symplectic matrix S_Gamma
-    -> graph-state covariance V = S_Gamma V0 S_Gamma.T
+    -> CV CZ symplectic matrix G
+    -> graph-state covariance V = G V0 G.T
     -> sanity checks
-    -> photon subtraction mode gamma and paper vector g_real
+    -> photon subtraction mode f_sub and paper vector g_sub
     -> node-wise observables
     -> graph color plot
 ```
@@ -99,12 +99,13 @@ Use 0-based indexing internally in Python. Use 1-based labels only for display i
 Keep these objects conceptually separate:
 
 ```text
-Gamma : graph adjacency matrix / CZ topology
-G     : NetworkX graph object for drawing and graph distances only
+Adj   : graph adjacency matrix / CZ topology
+G     : CV CZ symplectic matrix
+G_nx  : optional NetworkX graph object for drawing and graph distances only
 V0    : initial Gaussian covariance matrix
 V     : graph-state covariance matrix
-gamma : complex subtraction-mode vector, user-facing
-g_real: real phase-space subtraction vector, paper convention
+f_sub : complex subtraction-mode vector, user-facing
+g_sub : real phase-space subtraction vector, paper convention
 ```
 
 Do not store the quantum state in the NetworkX graph.
@@ -115,20 +116,20 @@ For the CV CZ graph-state transformation:
 
 ```text
 q_i -> q_i
-p_i -> p_i + sum_j Gamma_ij q_j
+p_i -> p_i + sum_j Adj_ij q_j
 ```
 
 With ordering `(q1,...,qm,p1,...,pm)`, use:
 
 ```text
-S_Gamma = [[I, 0],
-           [Gamma, I]]
+G = [[I,   0],
+     [Adj, I]]
 ```
 
 Then:
 
 ```text
-V = S_Gamma @ V0 @ S_Gamma.T
+V = G @ V0 @ G.T
 ```
 
 For pure p-squeezed input in the paper convention:
@@ -152,19 +153,37 @@ V0 = diag(10 I, 0.1 I)
 
 ## Sanity Checks
 
-Before photon subtraction, verify:
+Current preference for `Graph-State Sanity` is a light dimension/shape check, not a full physical verification yet.
+
+First verify that the main objects are consistent when `m` or the graph changes:
 
 ```text
+m is inferred from Adj
+Adj has shape m x m
+G has shape 2m x 2m
+V0 has shape 2m x 2m
 V has shape 2m x 2m
+f_sub has length m
+g_sub has length 2m
+Jg_sub has length 2m
+Pi_g has shape 2m x 2m
+```
+
+This is especially useful because `f_sub` may be hard-coded at first; if the graph size changes, the check should catch dimension mismatches immediately.
+
+Full physics checks can come later, after the notebook structure is stable:
+
+```text
 V is symmetric
 V is physical
+G is symplectic
 nullifier variance is correct
 ```
 
-Graph-state nullifier:
+Graph-state nullifier for the later physical check:
 
 ```text
-delta_i = p_i - sum_j Gamma_ij q_j
+delta_i = p_i - sum_j Adj_ij q_j
 ```
 
 For 10 dB p-squeezing with vacuum variance `1`, expected nullifier variance:
@@ -180,18 +199,18 @@ Do this later, after the Gaussian part is verified.
 Use a complex user-facing subtraction mode vector first:
 
 ```text
-gamma in C^m
-sum_j |gamma_j|^2 = 1
+f_sub in C^m
+sum_j |f_sub_j|^2 = 1
 ```
 
 Then convert it to the paper-convention real phase-space vector:
 
 ```text
-g_real = (Re gamma_1, ..., Re gamma_m, -Im gamma_1, ..., -Im gamma_m)^T
-g_real in R^(2m)
+g_sub = (Re f_sub_1, ..., Re f_sub_m, -Im f_sub_1, ..., -Im f_sub_m)^T
+g_sub in R^(2m)
 ```
 
-Single-vertex subtraction is the special case `gamma = e_c`.
+Single-vertex subtraction is the special case `f_sub = e_c`.
 
 The photon-subtracted state is non-Gaussian, so covariance alone is insufficient. Use analytic Wigner or characteristic-function formulas from the reference papers.
 
