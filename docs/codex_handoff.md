@@ -46,7 +46,7 @@ adjacency matrix Gamma
     -> CV CZ symplectic matrix S_Gamma
     -> graph-state covariance V = S_Gamma V0 S_Gamma.T
     -> sanity checks
-    -> photon subtraction mode g
+    -> photon subtraction mode gamma and paper vector g_real
     -> node-wise observables
     -> graph color plot
 ```
@@ -86,10 +86,10 @@ Quadrature ordering:
 (q1, q2, ..., qm, p1, p2, ..., pm)
 ```
 
-Vacuum variance convention:
+Vacuum variance convention for reproducing the Walschaers/PRA formulas directly:
 
 ```text
-Var(q) = Var(p) = 1/2
+Var(q_vac) = Var(p_vac) = 1
 ```
 
 Use 0-based indexing internally in Python. Use 1-based labels only for display if helpful.
@@ -103,7 +103,8 @@ Gamma : graph adjacency matrix / CZ topology
 G     : NetworkX graph object for drawing and graph distances only
 V0    : initial Gaussian covariance matrix
 V     : graph-state covariance matrix
-g     : photon-subtraction mode vector
+gamma : complex subtraction-mode vector, user-facing
+g_real: real phase-space subtraction vector, paper convention
 ```
 
 Do not store the quantum state in the NetworkX graph.
@@ -130,10 +131,10 @@ Then:
 V = S_Gamma @ V0 @ S_Gamma.T
 ```
 
-For pure p-squeezed input:
+For pure p-squeezed input in the paper convention:
 
 ```text
-V0 = 1/2 * diag(e^(2r) I, e^(-2r) I)
+V0 = diag(e^(2r) I, e^(-2r) I)
 ```
 
 For 10 dB squeezing:
@@ -146,7 +147,7 @@ e^(2r)  = 10
 So:
 
 ```text
-V0 = 1/2 * diag(10 I, 0.1 I)
+V0 = diag(10 I, 0.1 I)
 ```
 
 ## Sanity Checks
@@ -166,29 +167,31 @@ Graph-state nullifier:
 delta_i = p_i - sum_j Gamma_ij q_j
 ```
 
-For 10 dB p-squeezing with vacuum variance `1/2`, expected nullifier variance:
+For 10 dB p-squeezing with vacuum variance `1`, expected nullifier variance:
 
 ```text
-0.05
+0.1
 ```
 
 ## Photon Subtraction Plan
 
 Do this later, after the Gaussian part is verified.
 
-Single-vertex photon subtraction at vertex `c`:
+Use a complex user-facing subtraction mode vector first:
 
 ```text
-g = e_c
-a(g) = a_c
+gamma in C^m
+sum_j |gamma_j|^2 = 1
 ```
 
-More general mode-selective subtraction:
+Then convert it to the paper-convention real phase-space vector:
 
 ```text
-a(g) = sum_j g_j a_j
-sum_j |g_j|^2 = 1
+g_real = (Re gamma_1, ..., Re gamma_m, -Im gamma_1, ..., -Im gamma_m)^T
+g_real in R^(2m)
 ```
+
+Single-vertex subtraction is the special case `gamma = e_c`.
 
 The photon-subtracted state is non-Gaussian, so covariance alone is insufficient. Use analytic Wigner or characteristic-function formulas from the reference papers.
 
