@@ -42,6 +42,7 @@ The planned simulation flow is:
 ```text
 adjacency matrix Adj
     -> graph visualization
+    -> effective nullifier graph from covariance V
     -> initial Gaussian covariance V0
     -> CV CZ symplectic matrix G
     -> graph-state covariance V = G V0 G.T
@@ -59,6 +60,8 @@ Use this layer order in `simul.ipynb`:
 0. Convention & Goal
 1. Input Layer
 2. Graph Layer
+   2-1. Given graph structure from Adj
+   2-2. Effective Nullifier Graph from Covariance
 3. Gaussian Graph-State Layer
 4. Sanity Check Layer
 5. Photon Subtraction Layer
@@ -109,6 +112,146 @@ g_sub : real phase-space subtraction vector, paper convention
 ```
 
 Do not store the quantum state in the NetworkX graph.
+
+## Graph Layer Details
+
+The current `Graph Layer` should be split into two substeps.
+
+### 2-1. Given Graph Structure from Adj
+
+This is the direct graph check from the user-provided adjacency matrix:
+
+```text
+Adj -> graph structure / edge list / graph drawing
+```
+
+This step answers:
+
+```text
+What graph did we manually put into the notebook?
+```
+
+`Adj` is the source of truth for this step. NetworkX may be used as a visualization/helper tool:
+
+```text
+Adj -> G_nx -> drawing / edge list / graph distance
+```
+
+Here, `G_nx` is only for graph visualization and graph-theoretic utilities. It is not the quantum state, and it is not the CV CZ symplectic matrix `G`.
+
+Recommended package direction:
+
+```text
+calculation: numpy
+visualization / edge handling / graph distances: NetworkX + matplotlib
+```
+
+NetworkX is preferred for now because the graphs are small, the notebook should remain readable, and later distance-from-subtraction-node analysis may be useful.
+
+### 2-2. Effective Nullifier Graph from Covariance
+
+This is the next planned graph-layer method.
+
+Use the section title:
+
+```markdown
+## 2. Effective Nullifier Graph from Covariance
+```
+
+or, if the notebook needs shorter wording:
+
+```markdown
+## 2. Recover Effective Adjacency from V
+```
+
+Preferred name for accuracy:
+
+```text
+Effective Nullifier Graph from Covariance
+```
+
+The goal is:
+
+```text
+Given an arbitrary covariance matrix V, estimate a graph-like effective adjacency Gamma_eff.
+```
+
+This does not mean that an arbitrary `V` has a unique original CV graph-state adjacency. Instead, it gives the best linear nullifier-style graph relation:
+
+```text
+p approximately Gamma_eff x
+delta = p - Gamma_eff x
+```
+
+With quadrature ordering:
+
+```text
+(q1, q2, ..., qm, p1, p2, ..., pm)
+```
+
+split `V` into blocks:
+
+```text
+V = [[V_xx, V_xp],
+     [V_px, V_pp]]
+```
+
+Then define:
+
+```text
+Gamma_eff = V_px @ pinv(V_xx)
+```
+
+This is a least-squares/nullifier fit. It can be applied to an arbitrary physical covariance matrix `V`.
+
+For an ideal graph state:
+
+```text
+V = G @ V_in @ G.T
+```
+
+where `V_in` has no x-p cross correlations, this method should recover the original adjacency:
+
+```text
+Gamma_eff = Adj
+```
+
+Thus this step has two uses:
+
+```text
+1. Check that the ideal graph-state covariance recovers the manually chosen Adj.
+2. For a general covariance V, extract a graph-like effective adjacency for visualization/diagnosis.
+```
+
+For plotting, `Gamma_eff` may not be symmetric. Keep the raw matrix for analysis, but use a symmetrized version for undirected graph drawing:
+
+```text
+Gamma_plot = (Gamma_eff + Gamma_eff.T) / 2
+diag(Gamma_plot) = 0
+```
+
+This symmetrization is only for plotting.
+
+Also compute the nullifier covariance for fit quality:
+
+```text
+V_delta =
+    V_pp
+    - Gamma_eff @ V_xp
+    - V_px @ Gamma_eff.T
+    + Gamma_eff @ V_xx @ Gamma_eff.T
+```
+
+Track:
+
+```text
+Gamma_eff
+Gamma_plot
+V_delta
+diag(V_delta)
+```
+
+If `diag(V_delta)` is small, then the covariance is more graph-state-like in this nullifier sense. If it is large, the plotted graph may still be useful as a correlation/fit visualization, but it should not be interpreted as a recovered physical CZ topology.
 
 ## Gaussian Graph-State Construction
 
