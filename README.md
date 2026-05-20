@@ -40,15 +40,26 @@ python -m ipykernel install --user --name exp --display-name "Python (exp)"
 
 ## git 처음 세팅
 
+### 1) Git 사용자 정보 설정
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+```
+
+### 2) 로컬 저장소 초기화 및 원격 연결
+
 ```bash
 git init
 git add simul.ipynb README.md
-git commit -m "Initial commit"
+ git commit -m "Initial commit"
 git branch -M main
 git remote add origin https://github.com/jihyeoks/2026file.git
 git pull origin main --allow-unrelated-histories --no-rebase --no-edit
 git push -u origin main
 ```
+
+> `git config --global`은 이 컴퓨터 전체에 설정됩니다. 한 프로젝트에만 적용하려면 `--global`을 빼고 실행하세요.
 
 ## 수정 시 명령어
 
