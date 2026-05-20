@@ -1,0 +1,8 @@
+numpy==1.26.3
+networkx==3.4
+matplotlib==3.9.2
+ipykernel==6.30.1
+scipy==1.12.1
+sympy==1.13.0
+pandas==2.2.2
+qutip==5.0.0
