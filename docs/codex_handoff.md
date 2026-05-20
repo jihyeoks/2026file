@@ -28,6 +28,17 @@ If working on another computer, copy or relink these papers as needed.
 
 ## User Preferences
 
+- Absolute editing gate: do not modify files unless the user explicitly says one
+  of these exact Korean trigger phrases:
+  - `수정해`
+  - `파일에 넣어`
+  - `노트북에 추가해`
+- If the user says anything else, including exploratory phrases like
+  `만들어볼까`, `해볼까`, `생각해보자`, or `코드 짜볼까`, do not treat it as
+  permission to edit. Ask for confirmation before modifying any file.
+- Reading files, explaining, planning, and showing code drafts in chat are okay.
+  Writing files, patching files, formatting notebooks, or running commands that
+  change files requires one of the exact trigger phrases above.
 - Do not jump directly into full coding.
 - Discuss/design the notebook structure step by step first.
 - Do not create extra notes files unless explicitly requested.
@@ -150,7 +161,7 @@ NetworkX is preferred for now because the graphs are small, the notebook should 
 
 ### 2-2. Effective Nullifier Graph from Covariance
 
-This is the next planned graph-layer method.
+This is the current graph-layer plan.
 
 Use the section title:
 
@@ -170,88 +181,244 @@ Preferred name for accuracy:
 Effective Nullifier Graph from Covariance
 ```
 
-The goal is:
+### Goal
 
 ```text
-Given an arbitrary covariance matrix V, estimate a graph-like effective adjacency Gamma_eff.
+Draw a graph from an arbitrary Gaussian covariance matrix V, not only from the
+original adjacency matrix Adj.
 ```
 
-This does not mean that an arbitrary `V` has a unique original CV graph-state adjacency. Instead, it gives the best linear nullifier-style graph relation:
+The graph should be an effective nullifier graph: the graph-like relation
+between x and p quadratures that makes the nullifier noise smallest.
+
+This is not a Williamson or Bloch-Messiah decomposition. It is a
+least-squares fitting problem.
+
+This does not mean that an arbitrary `V` has a unique original CV graph-state
+adjacency. Instead, it gives the best linear nullifier-style graph relation.
+
+### Current Convention
+
+Quadrature ordering:
 
 ```text
-p approximately Gamma_eff x
-delta = p - Gamma_eff x
+q = (x_1, ..., x_m, p_1, ..., p_m)^T
 ```
 
-With quadrature ordering:
+Vacuum variance convention:
 
 ```text
-(q1, q2, ..., qm, p1, p2, ..., pm)
+V_vac = I
 ```
 
-split `V` into blocks:
+The current notebook already defines:
+
+```text
+Adj      : original graph adjacency
+m        : number of modes
+Omega    : [[0, I], [-I, 0]]
+J        : Omega.T
+G        : graph-state symplectic matrix, paper notation
+V0       : input covariance
+V        : graph-state covariance, V = G @ V0 @ G.T
+```
+
+The paper uses `G` for the graph-state symplectic transformation, so keep the
+name `G`.
+
+### Effective Nullifier Graph Algorithm
+
+Given an arbitrary covariance matrix:
 
 ```text
 V = [[V_xx, V_xp],
      [V_px, V_pp]]
 ```
 
-Then define:
+consider two possible graph-like nullifier forms:
 
 ```text
-Gamma_eff = V_px @ pinv(V_xx)
+delta_1 = p - Gamma_1 x
+delta_2 = x - Gamma_2 p
 ```
 
-This is a least-squares/nullifier fit. It can be applied to an arbitrary physical covariance matrix `V`.
+For each direction, find the best-fit `Gamma` by minimizing the residual noise.
 
-For an ideal graph state:
+Case 1, `p - Gamma x`:
 
 ```text
-V = G @ V_in @ G.T
+Gamma_1 = V_px @ pinv(V_xx)
 ```
 
-where `V_in` has no x-p cross correlations, this method should recover the original adjacency:
+Residual covariance:
 
 ```text
-Gamma_eff = Adj
-```
-
-Thus this step has two uses:
-
-```text
-1. Check that the ideal graph-state covariance recovers the manually chosen Adj.
-2. For a general covariance V, extract a graph-like effective adjacency for visualization/diagnosis.
-```
-
-For plotting, `Gamma_eff` may not be symmetric. Keep the raw matrix for analysis, but use a symmetrized version for undirected graph drawing:
-
-```text
-Gamma_plot = (Gamma_eff + Gamma_eff.T) / 2
-diag(Gamma_plot) = 0
-```
-
-This symmetrization is only for plotting.
-
-Also compute the nullifier covariance for fit quality:
-
-```text
-V_delta =
+V_delta_1 =
     V_pp
-    - Gamma_eff @ V_xp
-    - V_px @ Gamma_eff.T
-    + Gamma_eff @ V_xx @ Gamma_eff.T
+    - Gamma_1 @ V_xp
+    - V_px @ Gamma_1.T
+    + Gamma_1 @ V_xx @ Gamma_1.T
 ```
 
-Track:
+Case 2, `x - Gamma p`:
+
+```text
+Gamma_2 = V_xp @ pinv(V_pp)
+```
+
+Residual covariance:
+
+```text
+V_delta_2 =
+    V_xx
+    - Gamma_2 @ V_px
+    - V_xp @ Gamma_2.T
+    + Gamma_2 @ V_pp @ Gamma_2.T
+```
+
+Compare the two directions using:
+
+```text
+trace(V_delta_1)
+trace(V_delta_2)
+```
+
+Choose the direction with smaller trace.
+
+The selected matrix is:
 
 ```text
 Gamma_eff
-Gamma_plot
-V_delta
-diag(V_delta)
 ```
 
-If `diag(V_delta)` is small, then the covariance is more graph-state-like in this nullifier sense. If it is large, the plotted graph may still be useful as a correlation/fit visualization, but it should not be interpreted as a recovered physical CZ topology.
+The selected nullifier covariance is:
+
+```text
+V_delta
+```
+
+The node-wise nullifier noise is:
+
+```text
+nullifier_var = diag(V_delta)
+```
+
+Since `V_vac = I`, a node satisfies the squeezed nullifier condition if:
+
+```python
+nullifier_var[i] < 1
+```
+
+### Important Ideal Graph-State Check
+
+For the ideal graph state currently generated by:
+
+```text
+V = G @ V0 @ G.T
+G = [[I,   0],
+     [Adj, I]]
+```
+
+the first direction should win:
+
+```text
+delta_1 = p - Gamma_1 x
+```
+
+Also:
+
+```text
+Gamma_1 approximately equals Adj
+```
+
+So the notebook should print:
+
+```python
+max |Gamma1 - Adj|
+```
+
+This should be close to numerical zero for the current ideal test case.
+
+### Plotting Plan
+
+Use NetworkX only for drawing.
+
+For graph plotting, the fitted `Gamma_eff` may not be symmetric for arbitrary
+`V`. Keep the raw matrix for analysis, but make a plotting-only matrix:
+
+```python
+Gamma_plot = 0.5 * (Gamma_eff + Gamma_eff.T)
+np.fill_diagonal(Gamma_plot, 0)
+```
+
+Then threshold small edges:
+
+```python
+A_plot = np.where(np.abs(Gamma_plot) > threshold, np.abs(Gamma_plot), 0)
+```
+
+Convert to a NetworkX graph:
+
+```python
+G_plot = nx.from_numpy_array(A_plot)
+```
+
+Use automatic layout:
+
+```python
+pos = nx.spring_layout(G_plot, seed=0)
+```
+
+or, if the result looks better:
+
+```python
+pos = nx.kamada_kawai_layout(G_plot)
+```
+
+Node color should represent the quantity to visualize. Start with:
+
+```python
+node_values = nullifier_var
+```
+
+Later the same plotting function should be reused for:
+
+```python
+node_values = kurtosis_values
+node_values = purity_ratio
+node_values = other node-wise quantities
+```
+
+Define a reusable function in the first cell:
+
+```python
+plot_graph_from_matrix(W, node_values=None, title="", threshold=1e-6, pos=None)
+```
+
+This function should:
+
+```text
+1. symmetrize W for plotting
+2. zero the diagonal
+3. threshold small edges
+4. create a NetworkX graph
+5. use automatic layout if pos is None
+6. draw nodes with node_values as color
+7. return pos so later plots can reuse the same layout
+```
+
+This allows the same graph shape to be reused when plotting nullifier variance,
+kurtosis, purity, and other node-wise quantities.
+
+Core summary:
+
+```text
+Extract the effective graph from V.
+That graph is Gamma_eff, the least-squares graph that minimizes nullifier noise.
+Draw using Gamma_eff.
+Start node coloring with nullifier_var.
+Later reuse the same plot function for kurtosis, purity, and other quantities.
+```
 
 ## Gaussian Graph-State Construction
 
@@ -406,6 +573,11 @@ When continuing this project with Codex:
 ```text
 First read docs/codex_handoff.md.
 Then inspect simul.ipynb.
+Do not modify files unless the user explicitly says one of:
+수정해
+파일에 넣어
+노트북에 추가해
+If the user uses any other wording, ask before editing.
 Do not immediately implement the full simulation.
 Help design or implement only the next small layer.
 ```

@@ -9,17 +9,17 @@ conda activate exp
 
 ## docs에 있는 모듈 설치
 
-### 1) `docs/environment.yml`이 있는 경우
+### 1) `environment.yml`이 있는 경우
 
 ```bash
-conda env update -n exp -f docs/environment.yml
+conda env update -n exp -f environment.yml
 ```
 
-### 2) `docs/requirements.txt`가 있는 경우
+### 2) `requirements.txt`가 있는 경우
 
 ```bash
 conda activate exp
-pip install -r docs/requirements.txt
+pip install -r requirements.txt
 ```
 
 ### 3) 필요한 패키지를 직접 설치하는 경우
