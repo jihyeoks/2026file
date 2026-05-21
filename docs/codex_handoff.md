@@ -46,6 +46,18 @@ If working on another computer, copy or relink these papers as needed.
 - Prefer `simul.ipynb` as the main place for exploratory implementation and verification.
 - Use Python modules only later, after notebook functions become stable.
 
+### Recent Interaction Notes
+
+- Before editing any notebook/code file, read this handoff first and follow the
+  exact editing gate above. A user statement like "이렇게 해야지" or "그대로
+  그려야지" is discussion, not permission to patch files.
+- On 2026-05-21, Codex mistakenly edited `simul.ipynb` after discussion without
+  one of the required trigger phrases. Do not repeat this. If the user has not
+  explicitly said `수정해`, `파일에 넣어`, or `노트북에 추가해`, answer in chat
+  with explanation or a code draft only.
+- If the user explicitly asks to update this handoff file, modify only
+  `docs/codex_handoff.md` unless they name another file.
+
 ## Current Conceptual Plan
 
 The planned simulation flow is:
@@ -149,6 +161,12 @@ Adj -> G_nx -> drawing / edge list / graph distance
 ```
 
 Here, `G_nx` is only for graph visualization and graph-theoretic utilities. It is not the quantum state, and it is not the CV CZ symplectic matrix `G`.
+
+For this direct adjacency check, the user's intent is to draw the input
+adjacency matrix as entered. Do not silently symmetrize, take absolute values,
+or zero the diagonal unless the user explicitly decides that this particular
+plot should be "plotting-only" simplified. If a matrix is non-symmetric and the
+goal is to inspect it as entered, discuss whether to use `nx.DiGraph`.
 
 Recommended package direction:
 
@@ -374,6 +392,28 @@ or, if the result looks better:
 ```python
 pos = nx.kamada_kawai_layout(G_plot)
 ```
+
+Manual `pos` dictionaries should use NetworkX's internal node indices when the
+graph is created by `nx.from_numpy_array`, namely `0, 1, ..., m-1`. It is fine
+to display labels as `1, 2, ..., m` using a separate `labels` dictionary.
+
+If different vertical coordinates such as `0.1` and `0.9` appear visually
+similar, this is usually Matplotlib autoscaling each plot. Do not fix `xlim` or
+`ylim` by default, because the user may not know the desired `pos` range in
+advance. Prefer preserving coordinate aspect ratio with:
+
+```python
+plt.axis("equal")
+plt.axis("off")
+```
+
+`plt.axis("off")` hides axis lines, ticks, and coordinate numbers only; it does
+not remove or change the `pos` coordinates.
+
+`plt.figure(figsize=(6, 4))` is not required for `plt.colorbar(nodes)`, but it
+is useful for starting a fresh figure with a predictable display size. NetworkX
+draw calls such as `nx.draw_networkx_edges`, `nx.draw_networkx_nodes`, and
+`nx.draw_networkx_labels` draw onto Matplotlib's current axes/figure.
 
 Node color should represent the quantity to visualize. Start with:
 
