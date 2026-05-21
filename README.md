@@ -76,3 +76,12 @@ git push
 git status
 git remote -v
 ```
+## 다른 로컬에서 받고 싶을때 
+
+```bash
+git clone "https://github.com/jihyeoks/2026file.git"
+```
+## 업데이트만 필요할 때
+```bash
+git pull
+```
