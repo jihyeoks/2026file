@@ -2,18 +2,25 @@
 
 ## Project
 
-This repository is for a Jupyter notebook simulation of photon-subtracted continuous-variable graph states, based mainly on:
+This repository is for a Jupyter notebook simulation of photon-subtracted
+continuous-variable graph states, based mainly on:
 
 - Mattia Walschaers et al., "Tailoring Non-Gaussian Continuous-Variable Graph States", Phys. Rev. Lett. 121, 220501 (2018).
 - Additional reference: `PhysRevA.96.053835.pdf`.
 
-The goal is to reproduce the simulation logic step by step, not to rush into a full implementation.
+The goal is to reproduce the simulation logic step by step inside notebooks,
+not to rush into a full Python package.
 
-## Main Working File
+## Current Files
 
-- `simul.ipynb`
+- `simul.ipynb`: main working notebook. Current graph is the 6-node paper-style
+  test graph.
+- `simul_test.ipynb`: new test notebook. Current graph is a triangular lattice
+  made by `triangular_lattice_adjacency(n_rows)`.
+- `docs/codex_handoff.md`: this handoff file.
+- `README.md`: should stay short and command-focused.
 
-The notebook should remain the main research record. A `main.py` file is not needed at the current stage.
+No `main.py` is needed at the current stage.
 
 ## Reference PDFs
 
@@ -28,194 +35,30 @@ If working on another computer, copy or relink these papers as needed.
 
 ## User Preferences
 
-- Absolute editing gate: do not modify files unless the user explicitly says one
-  of these exact Korean trigger phrases:
+- Absolute editing gate: do not modify notebook/code files unless the user
+  explicitly says one of these exact Korean trigger phrases:
   - `수정해`
   - `파일에 넣어`
   - `노트북에 추가해`
-- If the user says anything else, including exploratory phrases like
-  `만들어볼까`, `해볼까`, `생각해보자`, or `코드 짜볼까`, do not treat it as
-  permission to edit. Ask for confirmation before modifying any file.
-- Reading files, explaining, planning, and showing code drafts in chat are okay.
-  Writing files, patching files, formatting notebooks, or running commands that
-  change files requires one of the exact trigger phrases above.
-- Do not jump directly into full coding.
-- Discuss/design the notebook structure step by step first.
-- Do not create extra notes files unless explicitly requested.
-- Keep `README.md` short and command-focused.
-- Prefer `simul.ipynb` as the main place for exploratory implementation and verification.
-- Use Python modules only later, after notebook functions become stable.
-
-### Recent Interaction Notes
-
-- Before editing any notebook/code file, read this handoff first and follow the
-  exact editing gate above. A user statement like "이렇게 해야지" or "그대로
-  그려야지" is discussion, not permission to patch files.
-- On 2026-05-21, Codex mistakenly edited `simul.ipynb` after discussion without
-  one of the required trigger phrases. Do not repeat this. If the user has not
-  explicitly said `수정해`, `파일에 넣어`, or `노트북에 추가해`, answer in chat
-  with explanation or a code draft only.
-- If the user explicitly asks to update this handoff file, modify only
+- If the user says exploratory phrases like `만들어볼까`, `해볼까`,
+  `생각해보자`, or `코드 짜볼까`, do not treat it as permission to edit.
+  Ask for confirmation before modifying files.
+- Reading files, explaining, planning, and showing code drafts in chat are OK.
+- If the user explicitly asks to update/create the handoff file, modify only
   `docs/codex_handoff.md` unless they name another file.
+- Do not jump directly into a full implementation. Help design or implement the
+  next small layer.
+- Prefer notebook-first development. Move code into Python modules only later,
+  after functions become stable.
 
-## Current Conceptual Plan
-
-The planned simulation flow is:
-
-```text
-adjacency matrix Adj
-    -> graph visualization
-    -> effective nullifier graph from covariance V
-    -> initial Gaussian covariance V0
-    -> CV CZ symplectic matrix G
-    -> graph-state covariance V = G V0 G.T
-    -> sanity checks
-    -> photon subtraction mode f_sub and paper vector g_sub
-    -> node-wise observables
-    -> graph color plot
-```
-
-## Notebook Layer Plan
-
-Use this layer order in `simul.ipynb`:
+Important recent mistake:
 
 ```text
-0. Convention & Goal
-1. Input Layer
-2. Graph Layer
-   2-1. Given graph structure from Adj
-   2-2. Effective Nullifier Graph from Covariance
-3. Gaussian Graph-State Layer
-4. Sanity Check Layer
-5. Photon Subtraction Layer
-6. Observable Layer
-7. Plot Layer
-8. Test Examples
+On 2026-05-21, Codex edited simul.ipynb after discussion without one of the
+required trigger phrases. Do not repeat this.
 ```
-
-Current implementation priority is only:
-
-```text
-1. Input Layer
-2. Graph Layer
-3. Gaussian Graph-State Layer
-4. Sanity Check Layer
-```
-
-Photon subtraction and excess kurtosis should come after the Gaussian graph-state construction is verified.
 
 ## Mathematical Convention
-
-Quadrature ordering:
-
-```text
-(q1, q2, ..., qm, p1, p2, ..., pm)
-```
-
-Vacuum variance convention for reproducing the Walschaers/PRA formulas directly:
-
-```text
-Var(q_vac) = Var(p_vac) = 1
-```
-
-Use 0-based indexing internally in Python. Use 1-based labels only for display if helpful.
-
-## Data Separation
-
-Keep these objects conceptually separate:
-
-```text
-Adj   : graph adjacency matrix / CZ topology
-G     : CV CZ symplectic matrix
-G_nx  : optional NetworkX graph object for drawing and graph distances only
-V0    : initial Gaussian covariance matrix
-V     : graph-state covariance matrix
-f_sub : complex subtraction-mode vector, user-facing
-g_sub : real phase-space subtraction vector, paper convention
-```
-
-Do not store the quantum state in the NetworkX graph.
-
-## Graph Layer Details
-
-The current `Graph Layer` should be split into two substeps.
-
-### 2-1. Given Graph Structure from Adj
-
-This is the direct graph check from the user-provided adjacency matrix:
-
-```text
-Adj -> graph structure / edge list / graph drawing
-```
-
-This step answers:
-
-```text
-What graph did we manually put into the notebook?
-```
-
-`Adj` is the source of truth for this step. NetworkX may be used as a visualization/helper tool:
-
-```text
-Adj -> G_nx -> drawing / edge list / graph distance
-```
-
-Here, `G_nx` is only for graph visualization and graph-theoretic utilities. It is not the quantum state, and it is not the CV CZ symplectic matrix `G`.
-
-For this direct adjacency check, the user's intent is to draw the input
-adjacency matrix as entered. Do not silently symmetrize, take absolute values,
-or zero the diagonal unless the user explicitly decides that this particular
-plot should be "plotting-only" simplified. If a matrix is non-symmetric and the
-goal is to inspect it as entered, discuss whether to use `nx.DiGraph`.
-
-Recommended package direction:
-
-```text
-calculation: numpy
-visualization / edge handling / graph distances: NetworkX + matplotlib
-```
-
-NetworkX is preferred for now because the graphs are small, the notebook should remain readable, and later distance-from-subtraction-node analysis may be useful.
-
-### 2-2. Effective Nullifier Graph from Covariance
-
-This is the current graph-layer plan.
-
-Use the section title:
-
-```markdown
-## 2. Effective Nullifier Graph from Covariance
-```
-
-or, if the notebook needs shorter wording:
-
-```markdown
-## 2. Recover Effective Adjacency from V
-```
-
-Preferred name for accuracy:
-
-```text
-Effective Nullifier Graph from Covariance
-```
-
-### Goal
-
-```text
-Draw a graph from an arbitrary Gaussian covariance matrix V, not only from the
-original adjacency matrix Adj.
-```
-
-The graph should be an effective nullifier graph: the graph-like relation
-between x and p quadratures that makes the nullifier noise smallest.
-
-This is not a Williamson or Bloch-Messiah decomposition. It is a
-least-squares fitting problem.
-
-This does not mean that an arbitrary `V` has a unique original CV graph-state
-adjacency. Instead, it gives the best linear nullifier-style graph relation.
-
-### Current Convention
 
 Quadrature ordering:
 
@@ -226,286 +69,311 @@ q = (x_1, ..., x_m, p_1, ..., p_m)^T
 Vacuum variance convention:
 
 ```text
-V_vac = I
+Var(x_vac) = Var(p_vac) = 1
 ```
 
-The current notebook already defines:
+Use 0-based indexing internally in Python. Use 1-based labels only for display
+if helpful.
+
+Main objects:
 
 ```text
-Adj      : original graph adjacency
-m        : number of modes
-Omega    : [[0, I], [-I, 0]]
-J        : Omega.T
-G        : graph-state symplectic matrix, paper notation
-V0       : input covariance
-V        : graph-state covariance, V = G @ V0 @ G.T
+Adj    : graph adjacency matrix / CZ topology
+G      : CV CZ symplectic matrix, paper notation
+V0     : initial Gaussian covariance matrix
+V      : graph-state covariance, V = G @ V0 @ G.T
+f_sub  : complex subtraction-mode vector in C^m
+g_sub  : real phase-space subtraction vector
+Jg_sub : J @ g_sub
+Pi_g   : g_sub g_sub.T + Jg_sub Jg_sub.T
 ```
 
-The paper uses `G` for the graph-state symplectic transformation, so keep the
-name `G`.
+Do not store the quantum state in a NetworkX graph. NetworkX is only for
+visualization and graph utilities.
 
-### Effective Nullifier Graph Algorithm
+## Current Notebook Flow
 
-Given an arbitrary covariance matrix:
+Current implemented flow in `simul.ipynb`:
+
+```text
+1. Set the graph state
+   - imports: numpy, networkx, matplotlib, pandas
+   - define Adj, m, Omega, J
+   - define CZ symplectic matrix G = [[I, 0], [Adj, I]]
+   - define V0 with 10 dB squeezing and vacuum variance 1
+   - compute V = G @ V0 @ G.T
+   - define f_sub, g_sub, Jg_sub, Pi_g
+
+2. Plotting / visualization helpers
+   - custom colormaps: blue, red
+   - plot_graph_from_matrix(...)
+   - show_mat(...)
+   - draw_mat(...)
+
+3. Graph-state sanity / effective nullifier graph
+   - split V into V_xx, V_xp, V_px, V_pp
+   - compute Gamma1 for p - Gamma x
+   - compute Gamma2 for x - Gamma p
+   - choose smaller trace residual
+   - set Gamma_eff, V_delta, nullifier_var
+   - plot effective nullifier graph
+
+4. Photon Subtraction on the graph
+   - compute A_minus
+   - compute node-wise p-quadrature excess kurtosis K_ex_p
+   - color graph nodes by K_ex_p
+```
+
+`simul_test.ipynb` mirrors this flow for a triangular lattice test. It defines:
+
+```text
+triangular_lattice_adjacency(n_rows)
+```
+
+For the current test:
+
+```text
+n_rows = 12
+total nodes = n_rows * (n_rows + 1) / 2 = 78
+f_sub is a single center-ish lattice node
+sub_label = f"center mode {center_idx + 1}"
+```
+
+## Graph Construction
+
+For the 6-node paper-style graph in `simul.ipynb`, `Adj` is explicitly written
+as a 6 by 6 matrix.
+
+For the triangular lattice in `simul_test.ipynb`, `triangular_lattice_adjacency`
+returns:
+
+```text
+Adj : symmetric adjacency matrix
+pos : triangular drawing positions using 0-based NetworkX node indices
+idx : map from lattice coordinate (r, c) to node index
+```
+
+The triangular layout uses:
+
+```text
+x = c - r / 2
+y = -sqrt(3) / 2 * r
+```
+
+When using `nx.from_numpy_array`, node indices are `0, 1, ..., m-1`. Display
+labels may still be shown as `1, 2, ..., m`.
+
+## Effective Nullifier Graph
+
+Given:
 
 ```text
 V = [[V_xx, V_xp],
      [V_px, V_pp]]
 ```
 
-consider two possible graph-like nullifier forms:
+compute two least-squares nullifier directions:
 
 ```text
-delta_1 = p - Gamma_1 x
-delta_2 = x - Gamma_2 p
+delta_1 = p - Gamma1 x
+Gamma1 = V_px @ pinv(V_xx)
+
+delta_2 = x - Gamma2 p
+Gamma2 = V_xp @ pinv(V_pp)
 ```
 
-For each direction, find the best-fit `Gamma` by minimizing the residual noise.
-
-Case 1, `p - Gamma x`:
+Residual covariances:
 
 ```text
-Gamma_1 = V_px @ pinv(V_xx)
+Vd1 = V_pp - Gamma1 @ V_xp - V_px @ Gamma1.T + Gamma1 @ V_xx @ Gamma1.T
+Vd2 = V_xx - Gamma2 @ V_px - V_xp @ Gamma2.T + Gamma2 @ V_pp @ Gamma2.T
 ```
 
-Residual covariance:
+Choose the smaller trace:
 
 ```text
-V_delta_1 =
-    V_pp
-    - Gamma_1 @ V_xp
-    - V_px @ Gamma_1.T
-    + Gamma_1 @ V_xx @ Gamma_1.T
-```
-
-Case 2, `x - Gamma p`:
-
-```text
-Gamma_2 = V_xp @ pinv(V_pp)
-```
-
-Residual covariance:
-
-```text
-V_delta_2 =
-    V_xx
-    - Gamma_2 @ V_px
-    - V_xp @ Gamma_2.T
-    + Gamma_2 @ V_pp @ Gamma_2.T
-```
-
-Compare the two directions using:
-
-```text
-trace(V_delta_1)
-trace(V_delta_2)
-```
-
-Choose the direction with smaller trace.
-
-The selected matrix is:
-
-```text
-Gamma_eff
-```
-
-The selected nullifier covariance is:
-
-```text
-V_delta
-```
-
-The node-wise nullifier noise is:
-
-```text
-nullifier_var = diag(V_delta)
-```
-
-Since `V_vac = I`, a node satisfies the squeezed nullifier condition if:
-
-```python
-nullifier_var[i] < 1
-```
-
-### Important Ideal Graph-State Check
-
-For the ideal graph state currently generated by:
-
-```text
-V = G @ V0 @ G.T
-G = [[I,   0],
-     [Adj, I]]
-```
-
-the first direction should win:
-
-```text
-delta_1 = p - Gamma_1 x
-```
-
-Also:
-
-```text
-Gamma_1 approximately equals Adj
-```
-
-So the notebook should print:
-
-```python
-max |Gamma1 - Adj|
-```
-
-This should be close to numerical zero for the current ideal test case.
-
-### Plotting Plan
-
-Use NetworkX only for drawing.
-
-For graph plotting, the fitted `Gamma_eff` may not be symmetric for arbitrary
-`V`. Keep the raw matrix for analysis, but make a plotting-only matrix:
-
-```python
-Gamma_plot = 0.5 * (Gamma_eff + Gamma_eff.T)
-np.fill_diagonal(Gamma_plot, 0)
-```
-
-Then threshold small edges:
-
-```python
-A_plot = np.where(np.abs(Gamma_plot) > threshold, np.abs(Gamma_plot), 0)
-```
-
-Convert to a NetworkX graph:
-
-```python
-G_plot = nx.from_numpy_array(A_plot)
-```
-
-Use automatic layout:
-
-```python
-pos = nx.spring_layout(G_plot, seed=0)
-```
-
-or, if the result looks better:
-
-```python
-pos = nx.kamada_kawai_layout(G_plot)
-```
-
-Manual `pos` dictionaries should use NetworkX's internal node indices when the
-graph is created by `nx.from_numpy_array`, namely `0, 1, ..., m-1`. It is fine
-to display labels as `1, 2, ..., m` using a separate `labels` dictionary.
-
-If different vertical coordinates such as `0.1` and `0.9` appear visually
-similar, this is usually Matplotlib autoscaling each plot. Do not fix `xlim` or
-`ylim` by default, because the user may not know the desired `pos` range in
-advance. Prefer preserving coordinate aspect ratio with:
-
-```python
-plt.axis("equal")
-plt.axis("off")
-```
-
-`plt.axis("off")` hides axis lines, ticks, and coordinate numbers only; it does
-not remove or change the `pos` coordinates.
-
-`plt.figure(figsize=(6, 4))` is not required for `plt.colorbar(nodes)`, but it
-is useful for starting a fresh figure with a predictable display size. NetworkX
-draw calls such as `nx.draw_networkx_edges`, `nx.draw_networkx_nodes`, and
-`nx.draw_networkx_labels` draw onto Matplotlib's current axes/figure.
-
-Node color should represent the quantity to visualize. Start with:
-
-```python
-node_values = nullifier_var
-```
-
-Later the same plotting function should be reused for:
-
-```python
-node_values = kurtosis_values
-node_values = purity_ratio
-node_values = other node-wise quantities
-```
-
-Define a reusable function in the first cell:
-
-```python
-plot_graph_from_matrix(W, node_values=None, title="", threshold=1e-6, pos=None)
-```
-
-This function should:
-
-```text
-1. symmetrize W for plotting
-2. zero the diagonal
-3. threshold small edges
-4. create a NetworkX graph
-5. use automatic layout if pos is None
-6. draw nodes with node_values as color
-7. return pos so later plots can reuse the same layout
-```
-
-This allows the same graph shape to be reused when plotting nullifier variance,
-kurtosis, purity, and other node-wise quantities.
-
-Core summary:
-
-```text
-Extract the effective graph from V.
-That graph is Gamma_eff, the least-squares graph that minimizes nullifier noise.
-Draw using Gamma_eff.
-Start node coloring with nullifier_var.
-Later reuse the same plot function for kurtosis, purity, and other quantities.
-```
-
-## Gaussian Graph-State Construction
-
-For the CV CZ graph-state transformation:
-
-```text
-q_i -> q_i
-p_i -> p_i + sum_j Adj_ij q_j
-```
-
-With ordering `(q1,...,qm,p1,...,pm)`, use:
-
-```text
-G = [[I,   0],
-     [Adj, I]]
+if trace(Vd1) <= trace(Vd2):
+    Gamma_eff = Gamma1
+    V_delta = Vd1
+    nullifier_type = "p - Gamma x"
+else:
+    Gamma_eff = Gamma2
+    V_delta = Vd2
+    nullifier_type = "x - Gamma p"
 ```
 
 Then:
 
 ```text
+nullifier_var = diag(V_delta)
+```
+
+For the ideal graph state generated by:
+
+```text
+G = [[I, 0], [Adj, I]]
 V = G @ V0 @ G.T
 ```
 
-For pure p-squeezed input in the paper convention:
+the first direction should win and `Gamma1` should approximately equal `Adj`.
 
-```text
-V0 = diag(e^(2r) I, e^(-2r) I)
+## Plotting Helpers
+
+### `plot_graph_from_matrix`
+
+Current signature:
+
+```python
+plot_graph_from_matrix(
+    W,
+    node_values=None,
+    title="",
+    threshold=1e-6,
+    pos=None,
+    cmap=blue,
+    vmin=None,
+    vmax=None,
+    colorbar_label="",
+    draw_labels=None
+)
 ```
 
-For 10 dB squeezing:
+Current behavior:
 
-```text
-e^(-2r) = 0.1
-e^(2r)  = 10
+- Converts `W` to `W_plot = np.array(W, dtype=float).copy()`.
+- Creates `G_plot = nx.from_numpy_array(W_plot)`.
+- If `pos is None`, uses `nx.kamada_kawai_layout(G_plot)`.
+- Labels are displayed as `i + 1`.
+- If `node_values is None`, node labels are shown by default.
+- If `node_values` exists, labels are hidden by default unless
+  `draw_labels=True`.
+- Uses `plt.axis("equal")` and `plt.axis("off")`.
+- Returns `pos` so later plots can reuse the same layout.
+
+For larger graphs in `simul_test.ipynb`, the function adapts figure size,
+node size, font size, and edge width based on the number of nodes.
+
+Note: Earlier plans discussed symmetrizing `Gamma_eff` for plotting. Current
+notebook code does not do that inside `plot_graph_from_matrix`. If this matters,
+discuss before changing the notebook.
+
+### Matrix Display
+
+Current matrix helpers:
+
+```python
+show_mat(M, name="M", digits=3, tol=1e-10)
+draw_mat(M, title="", cmap="bwr", label=False, digits=2, vlim=None, figsize=(4.5, 4))
 ```
 
-So:
+`show_mat`:
+
+- Zeroes tiny values under `tol`.
+- Uses `pandas.DataFrame(...).style.format(...)`.
+- Gives a readable numeric matrix table with 1-based row/column labels.
+
+`draw_mat`:
+
+- Uses `imshow` with a diverging colormap.
+- Shows row/column ticks as 1-based indices.
+- Uses `vlim` if given, otherwise the 95th percentile of absolute values.
+- If `label=True`, writes numbers inside the cells.
+
+User preference from discussion:
 
 ```text
-V0 = diag(10 I, 0.1 I)
+For matrices, the user wants the numbers to be visible and the result to look
+like a matrix, not just a heatmap. Keep helper functions short and practical.
 ```
+
+## Photon Subtraction Layer
+
+The current implemented layer computes:
+
+```text
+V, Pi_g -> A_minus -> node-wise p-quadrature excess kurtosis K_ex_p
+```
+
+Do not build the full density matrix or Wigner function yet.
+
+### A Matrix
+
+Formula:
+
+```text
+A_minus = 2 * (V - I) Pi_g (V - I) / Tr[(V - I) Pi_g]
+```
+
+Current code structure:
+
+```python
+I_2m = np.eye(2 * m)
+denom = np.trace((V - I_2m) @ Pi_g)
+
+if np.isclose(denom, 0):
+    raise ValueError("denom is close to zero: photon subtraction mode may be vacuum-like.")
+
+A_minus = 2 * (V - I_2m) @ Pi_g @ (V - I_2m) / denom
+```
+
+Current sanity prints:
+
+```python
+print("Pi_g projector check:", bool(np.linalg.norm(Pi_g @ Pi_g - Pi_g)) < 1e-10)
+print("A_minus symmetric check:", bool(np.linalg.norm(A_minus - A_minus.T) < 1e-10))
+```
+
+Note: `denom` is currently described in comments as related to photon
+subtraction success probability. If precision matters, verify this convention
+against the paper before using it quantitatively.
+
+### Node-wise p-quadrature Excess Kurtosis
+
+With ordering:
+
+```text
+q = (x_1, ..., x_m, p_1, ..., p_m)^T
+```
+
+the p indices are:
+
+```python
+p_indices = np.arange(m, 2 * m)
+```
+
+Current formula:
+
+```python
+v_p = np.diag(V)[p_indices]
+a_p = np.diag(A_minus)[p_indices]
+K_ex_p = -3 * (a_p ** 2) / ((v_p + a_p) ** 2)
+```
+
+Interpretation:
+
+```text
+v_p    : p-quadrature variances before photon subtraction
+a_p    : p-quadrature diagonal contribution from A_minus
+K_ex_p : node-wise p-quadrature excess kurtosis
+```
+
+Graph coloring:
+
+```python
+pos = plot_graph_from_matrix(
+    Gamma_eff,
+    node_values=K_ex_p,
+    title=f"p-quad Excess Kurtosis \nsubtracted at {sub_label}",
+    pos=pos,
+    draw_labels=False  # simul.ipynb
+)
+```
+
+In `simul_test.ipynb`, the current call uses `draw_labels=True`.
 
 ## Sanity Checks
 
-Current preference for `Graph-State Sanity` is a light dimension/shape check, not a full physical verification yet.
-
-First verify that the main objects are consistent when `m` or the graph changes:
+Dimension/shape checks remain useful:
 
 ```text
 m is inferred from Adj
@@ -519,9 +387,7 @@ Jg_sub has length 2m
 Pi_g has shape 2m x 2m
 ```
 
-This is especially useful because `f_sub` may be hard-coded at first; if the graph size changes, the check should catch dimension mismatches immediately.
-
-Full physics checks can come later, after the notebook structure is stable:
+Further physics checks can come later:
 
 ```text
 V is symmetric
@@ -530,81 +396,46 @@ G is symplectic
 nullifier variance is correct
 ```
 
-Graph-state nullifier for the later physical check:
-
-```text
-delta_i = p_i - sum_j Adj_ij q_j
-```
-
-For 10 dB p-squeezing with vacuum variance `1`, expected nullifier variance:
+For 10 dB p-squeezed input with vacuum variance 1, expected ideal nullifier
+variance is:
 
 ```text
 0.1
 ```
 
-## Photon Subtraction Plan
+## Next Likely Tasks
 
-Do this later, after the Gaussian part is verified.
-
-Use a complex user-facing subtraction mode vector first:
+Good next steps:
 
 ```text
-f_sub in C^m
-sum_j |f_sub_j|^2 = 1
+1. Verify the A_minus / K_ex_p formulas against the reference paper notation.
+2. Decide whether A_minus should be explicitly symmetrized numerically.
+3. Decide whether Gamma_eff plotting should use raw Gamma_eff or a plotting-only symmetrized matrix.
+4. Clean up duplicated helper functions between simul.ipynb and simul_test.ipynb only when the notebook workflow stabilizes.
+5. Test smaller graphs first when debugging, then return to the triangular lattice.
 ```
 
-Then convert it to the paper-convention real phase-space vector:
-
-```text
-g_sub = (Re f_sub_1, ..., Re f_sub_m, -Im f_sub_1, ..., -Im f_sub_m)^T
-g_sub in R^(2m)
-```
-
-Single-vertex subtraction is the special case `f_sub = e_c`.
-
-The photon-subtracted state is non-Gaussian, so covariance alone is insufficient. Use analytic Wigner or characteristic-function formulas from the reference papers.
-
-## First Observable
-
-First target observable:
-
-```text
-node-wise phase-quadrature excess kurtosis
-```
-
-For node `k`:
-
-```text
-K_ex(k) = <(Delta p_k)^4> / <(Delta p_k)^2>^2 - 3
-```
-
-Gaussian reference:
-
-```text
-K_ex = 0
-```
-
-Negative values indicate sub-Gaussian phase-quadrature statistics.
-
-Later:
+Later observables:
 
 ```text
 purity ratio mu / mu_Gauss
 single-mode Wigner function W_k(q,p)
+other node-wise quantities
 ```
 
 ## Test Graph Order
 
-Start from small graphs:
+Recommended debugging order:
 
 ```text
 1. 3-node line graph
-2. 7-node line graph
-3. small paper-like graph
-4. triangular lattice / Fig. 3-like graph
+2. 6-node paper-style graph
+3. 7-node line graph
+4. small triangular lattice
+5. larger triangular lattice / Fig. 3-like graph
 ```
 
-Do not start directly from the triangular lattice.
+Do not debug first on the large triangular lattice if something basic breaks.
 
 ## Recommended Interaction Style
 
@@ -612,12 +443,12 @@ When continuing this project with Codex:
 
 ```text
 First read docs/codex_handoff.md.
-Then inspect simul.ipynb.
-Do not modify files unless the user explicitly says one of:
+Then inspect simul.ipynb and, if relevant, simul_test.ipynb.
+Do not modify notebooks unless the user explicitly says one of:
 수정해
 파일에 넣어
 노트북에 추가해
-If the user uses any other wording, ask before editing.
+If the user asks to update this handoff, edit only docs/codex_handoff.md.
 Do not immediately implement the full simulation.
 Help design or implement only the next small layer.
 ```
