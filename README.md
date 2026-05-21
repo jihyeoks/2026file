@@ -82,6 +82,7 @@ git remote -v
 git clone "https://github.com/jihyeoks/2026file.git"
 ```
 ## 업데이트만 필요할 때
+
 ```bash
 git pull
 ```
