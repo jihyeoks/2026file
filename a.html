@@ -23,14 +23,15 @@
     .node text{font-size:16px;font-weight:400;text-anchor:middle;dominant-baseline:central;fill:#111;pointer-events:none}
     .node.selected circle{stroke:#333;stroke-width:3.8}
     .node:hover circle{stroke:#111;stroke-width:4.2}
-    #colorbar{position:absolute;right:122px;top:112px;width:95px;height:780px;overflow:visible}
+    #colorbar{position:absolute;right:230px;top:112px;width:95px;height:780px;overflow:visible}
     .tick text{font-size:24px;fill:#111}
     .tick line{stroke:#111;stroke-width:2.3}
     .bar-label{position:absolute;right:10px;top:430px;transform:rotate(-90deg);font-size:28px;font-weight:400}
-    .mini-controls{position:absolute;left:18px;top:14px;display:flex;gap:8px;opacity:.05;transition:.2s;z-index:10}
+    .mini-controls{position:absolute;left:18px;top:14px;display:flex;gap:8px;flex-wrap:wrap;max-width:760px;opacity:.05;transition:.2s;z-index:10}
     .mini-controls:hover{opacity:1}
     button{border:1px solid #ddd;background:white;border-radius:999px;padding:8px 12px;font-size:13px;cursor:pointer}
     button.active{background:#111;color:white}
+    input{border:1px solid #ddd;background:white;border-radius:999px;padding:8px 12px;font-size:13px;width:230px}
     .hint{position:absolute;left:18px;bottom:14px;color:#777;font-size:13px;opacity:0;transition:.2s}
     .slide:hover .hint{opacity:1}
   </style>
@@ -40,7 +41,15 @@
     <div class="mini-controls">
       <button class="q active" data-q="p">p-quad</button>
       <button class="q" data-q="x">x-quad</button>
+      <button class="pick active" data-pick="single">single</button>
+      <button class="pick" data-pick="superpose">superpose</button>
+      <button class="phase active" data-re="1" data-im="0">1</button>
+      <button class="phase" data-re="0" data-im="1">i</button>
+      <button class="phase" data-re="-1" data-im="0">-1</button>
+      <button class="phase" data-re="0" data-im="-1">-i</button>
       <button id="centerBtn">center 25</button>
+      <input id="modeInput" placeholder="25:1, 26:1 or 25:1+i">
+      <button id="applyModeBtn">apply mode</button>
     </div>
 
     <div class="title" id="title">
@@ -65,7 +74,7 @@
       <g id="ticks"></g>
     </svg>
     <div class="bar-label">Excess Kurtosis</div>
-    <div class="hint">노드를 클릭하면 subtraction mode가 바뀝니다. F: fullscreen</div>
+    <div class="hint">single: 노드 하나 선택. superpose: 위상 버튼 선택 후 여러 노드 클릭. 입력 예: 25:1, 26:i. F: fullscreen</div>
   </main>
 
 <script>
@@ -120,6 +129,9 @@ let selected = centerNode;
 let quad = 'p';
 const squeezing_dB = 10;
 const s = Math.pow(10, squeezing_dB / 10);
+let modeCoeffs = singleMode(centerNode);
+let pickMode = 'single';
+let currentPhase = { re: 1, im: 0 };
 
 function svgLayout(rawPos) {
   const points = Object.values(rawPos);
@@ -189,6 +201,143 @@ function graphDistances(start) {
   return dist;
 }
 
+function singleMode(node) {
+  const coeffs = Array.from({ length: m }, () => ({ re: 0, im: 0 }));
+  coeffs[node] = { re: 1, im: 0 };
+  return coeffs;
+}
+
+function coeffAbs(c) {
+  return Math.hypot(c.re, c.im);
+}
+
+function normalizeCoeffs(coeffs) {
+  const norm = Math.sqrt(coeffs.reduce((acc, c) => acc + c.re * c.re + c.im * c.im, 0));
+  if (!Number.isFinite(norm) || norm === 0) throw new Error('mode norm is zero');
+  return coeffs.map(c => ({ re: c.re / norm, im: c.im / norm }));
+}
+
+function activeModeCount() {
+  return modeCoeffs.filter(c => coeffAbs(c) > 1e-10).length;
+}
+
+function parseComplex(text) {
+  const s0 = text.trim().replace(/\s+/g, '').replace(/j/g, 'i');
+  if (!s0) throw new Error('empty coefficient');
+  if (!s0.includes('i')) return { re: Number(s0), im: 0 };
+  if (!s0.endsWith('i')) throw new Error(`bad complex coefficient: ${text}`);
+
+  const body = s0.slice(0, -1);
+  if (body === '' || body === '+') return { re: 0, im: 1 };
+  if (body === '-') return { re: 0, im: -1 };
+
+  let split = -1;
+  for (let i = 1; i < body.length; i++) {
+    if (body[i] === '+' || body[i] === '-') split = i;
+  }
+
+  function parseImag(part) {
+    if (part === '+') return 1;
+    if (part === '-') return -1;
+    return Number(part);
+  }
+
+  if (split === -1) return { re: 0, im: Number(body) };
+  return {
+    re: Number(body.slice(0, split)),
+    im: parseImag(body.slice(split))
+  };
+}
+
+function parseModeInput(text) {
+  const coeffs = Array.from({ length: m }, () => ({ re: 0, im: 0 }));
+  const terms = text.split(/[,\n]+/).map(x => x.trim()).filter(Boolean);
+  if (terms.length === 0) throw new Error('mode input is empty');
+
+  for (const term of terms) {
+    const match = term.match(/^(\d+)\s*[:=]\s*(.+)$/);
+    if (!match) throw new Error(`bad term: ${term}`);
+    const node = Number(match[1]) - 1;
+    if (!Number.isInteger(node) || node < 0 || node >= m) throw new Error(`node out of range: ${match[1]}`);
+
+    const c = parseComplex(match[2]);
+    if (!Number.isFinite(c.re) || !Number.isFinite(c.im)) throw new Error(`bad coefficient: ${match[2]}`);
+    coeffs[node] = { re: coeffs[node].re + c.re, im: coeffs[node].im + c.im };
+  }
+
+  return coeffs;
+}
+
+function phaseVectorsFromCoeffs(coeffs) {
+  coeffs = normalizeCoeffs(coeffs);
+  const g = Array(2 * m).fill(0);
+  const Jg = Array(2 * m).fill(0);
+  for (let i = 0; i < m; i++) {
+    const c = coeffs[i];
+    g[i] = c.re;
+    g[m + i] = -c.im;
+    Jg[i] = c.im;
+    Jg[m + i] = c.re;
+  }
+  return { g, Jg };
+}
+
+function modeAnchorNode() {
+  let best = 0;
+  let bestAbs = -1;
+  for (let i = 0; i < m; i++) {
+    const a = coeffAbs(modeCoeffs[i]);
+    if (a > bestAbs) {
+      best = i;
+      bestAbs = a;
+    }
+  }
+  return best;
+}
+
+function isSingleMode() {
+  return modeCoeffs.filter(c => coeffAbs(c) > 1e-10).length === 1;
+}
+
+function setSingleMode(node) {
+  selected = node;
+  pickMode = 'single';
+  modeCoeffs = singleMode(node);
+  renderGraph();
+}
+
+function samePhase(a, b) {
+  return Math.abs(a.re - b.re) < 1e-10 && Math.abs(a.im - b.im) < 1e-10;
+}
+
+function toggleSuperpositionNode(node) {
+  const old = modeCoeffs[node];
+  const active = coeffAbs(old) > 1e-10;
+
+  if (active && samePhase(old, currentPhase) && activeModeCount() > 1) {
+    modeCoeffs[node] = { re: 0, im: 0 };
+  } else {
+    modeCoeffs[node] = { ...currentPhase };
+  }
+
+  selected = modeAnchorNode();
+  renderGraph();
+}
+
+function coeffText(c) {
+  if (Math.abs(c.im) < 1e-10) return `${c.re.toFixed(2)}`;
+  if (Math.abs(c.re) < 1e-10) return `${c.im.toFixed(2)}i`;
+  return `${c.re.toFixed(2)}${c.im >= 0 ? '+' : ''}${c.im.toFixed(2)}i`;
+}
+
+function modeInputText() {
+  return modeCoeffs
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => coeffAbs(c) > 1e-10)
+    .map(({ c, i }) => `${i + 1}:${coeffText(c)}`)
+    .join(', ');
+}
+
 function excessKurtosisFromVarAndA(varQ, Aii) {
   // For W^-(r) = 1/2 [r^T V^{-1} A^- V^{-1} r - Tr(V^{-1}A^-) + 2] W_G(r),
   // <Q^2> = Var(Q) + Aii and <Q^4> = 3 Var(Q)^2 + 6 Var(Q) Aii.
@@ -197,13 +346,22 @@ function excessKurtosisFromVarAndA(varQ, Aii) {
   return fourth / (second * second) - 3;
 }
 
-function computeKurtosisForSelectedNode() {
-  const xCol = selected;
-  const pCol = m + selected;
+function computeKurtosisForMode() {
+  const { g, Jg } = phaseVectorsFromCoeffs(modeCoeffs);
 
-  // Π_g = |x_s><x_s| + |p_s><p_s| for single real-mode subtraction.
-  // A^- = 2 M Π_g M / Tr(M Π_g)
-  const denom = M_entry(xCol, xCol) + M_entry(pCol, pCol);
+  function Mdot(row, vec) {
+    let out = 0;
+    for (let col = 0; col < 2 * m; col++) out += M_entry(row, col) * vec[col];
+    return out;
+  }
+
+  const Mg = Array.from({ length: 2 * m }, (_, row) => Mdot(row, g));
+  const MJg = Array.from({ length: 2 * m }, (_, row) => Mdot(row, Jg));
+
+  // Pi_g = gg^T + Jg(Jg)^T, A^- = 2 M Pi_g M / Tr(M Pi_g)
+  let denom = 0;
+  for (let i = 0; i < 2 * m; i++) denom += g[i] * Mg[i] + Jg[i] * MJg[i];
+  if (Math.abs(denom) < 1e-12) throw new Error('denom is close to zero');
 
   const Kx = Array(m).fill(0);
   const Kp = Array(m).fill(0);
@@ -212,15 +370,8 @@ function computeKurtosisForSelectedNode() {
     const xIndex = node;
     const pIndex = m + node;
 
-    const A_xx = 2 * (
-      M_entry(xIndex, xCol) * M_entry(xIndex, xCol) +
-      M_entry(xIndex, pCol) * M_entry(xIndex, pCol)
-    ) / denom;
-
-    const A_pp = 2 * (
-      M_entry(pIndex, xCol) * M_entry(pIndex, xCol) +
-      M_entry(pIndex, pCol) * M_entry(pIndex, pCol)
-    ) / denom;
+    const A_xx = 2 * (Mg[xIndex] * Mg[xIndex] + MJg[xIndex] * MJg[xIndex]) / denom;
+    const A_pp = 2 * (Mg[pIndex] * Mg[pIndex] + MJg[pIndex] * MJg[pIndex]) / denom;
 
     Kx[node] = excessKurtosisFromVarAndA(V_diag(xIndex), A_xx);
     Kp[node] = excessKurtosisFromVarAndA(V_diag(pIndex), A_pp);
@@ -230,7 +381,7 @@ function computeKurtosisForSelectedNode() {
     if (Math.abs(Kp[node]) < 1e-12) Kp[node] = 0;
   }
 
-  return { Kx, Kp, Kmin: Kx.map((x, i) => Math.min(x, Kp[i])), dist: graphDistances(selected) };
+  return { Kx, Kp, Kmin: Kx.map((x, i) => Math.min(x, Kp[i])), dist: graphDistances(modeAnchorNode()) };
 }
 
 function valueFor(result, node) {
@@ -257,11 +408,27 @@ function colorFromK(k) {
 }
 
 function selectedLabel() {
-  return selected === centerNode ? 'center mode 25' : `mode ${selected + 1}`;
+  const active = modeCoeffs
+    .map((c, i) => ({ c, i, a: coeffAbs(c) }))
+    .filter(x => x.a > 1e-10);
+
+  if (active.length === 1) {
+    const node = active[0].i;
+    return node === centerNode ? 'center mode 25' : `mode ${node + 1}`;
+  }
+
+  const terms = active
+    .sort((a, b) => b.a - a.a)
+    .slice(0, 3)
+    .map(({ c, i }) => {
+      const im = Math.abs(c.im) < 1e-10 ? '' : `${c.im >= 0 ? '+' : ''}${c.im.toFixed(2)}i`;
+      return `${i + 1}:${c.re.toFixed(2)}${im}`;
+    });
+  return `custom mode ${terms.join(', ')}${active.length > 3 ? ', ...' : ''}`;
 }
 
 function renderGraph() {
-  const result = computeKurtosisForSelectedNode();
+  const result = computeKurtosisForMode();
   const values = Array.from({ length: m }, (_, i) => valueFor(result, i));
   const minK = Math.min(...values);
 
@@ -289,9 +456,12 @@ function renderGraph() {
 
   for (let i = 0; i < m; i++) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    group.setAttribute('class', 'node' + (i === selected ? ' selected' : ''));
+    group.setAttribute('class', 'node' + (coeffAbs(modeCoeffs[i]) > 1e-10 ? ' selected' : ''));
     group.setAttribute('transform', `translate(${pos[i][0]},${pos[i][1]})`);
-    group.onclick = () => { selected = i; renderGraph(); };
+    group.onclick = () => {
+      if (pickMode === 'single') setSingleMode(i);
+      else toggleSuperpositionNode(i);
+    };
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('r', 19.3);
@@ -308,6 +478,14 @@ function renderGraph() {
   document.querySelectorAll('.q').forEach(button => {
     button.classList.toggle('active', button.dataset.q === quad);
   });
+  document.querySelectorAll('.pick').forEach(button => {
+    button.classList.toggle('active', button.dataset.pick === pickMode);
+  });
+  document.querySelectorAll('.phase').forEach(button => {
+    const phase = { re: Number(button.dataset.re), im: Number(button.dataset.im) };
+    button.classList.toggle('active', samePhase(phase, currentPhase));
+  });
+  document.getElementById('modeInput').value = modeInputText();
 }
 
 function renderTicks() {
@@ -340,7 +518,33 @@ function renderTicks() {
 document.querySelectorAll('.q').forEach(button => {
   button.onclick = () => { quad = button.dataset.q; renderGraph(); };
 });
-document.getElementById('centerBtn').onclick = () => { selected = centerNode; renderGraph(); };
+document.querySelectorAll('.pick').forEach(button => {
+  button.onclick = () => {
+    pickMode = button.dataset.pick;
+    renderGraph();
+  };
+});
+document.querySelectorAll('.phase').forEach(button => {
+  button.onclick = () => {
+    currentPhase = { re: Number(button.dataset.re), im: Number(button.dataset.im) };
+    pickMode = 'superpose';
+    renderGraph();
+  };
+});
+document.getElementById('centerBtn').onclick = () => { setSingleMode(centerNode); };
+document.getElementById('applyModeBtn').onclick = () => {
+  try {
+    modeCoeffs = parseModeInput(document.getElementById('modeInput').value);
+    selected = modeAnchorNode();
+    pickMode = isSingleMode() ? 'single' : 'superpose';
+    renderGraph();
+  } catch (err) {
+    alert(err.message);
+  }
+};
+document.getElementById('modeInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('applyModeBtn').click();
+});
 document.addEventListener('keydown', e => {
   if (e.key.toLowerCase() === 'f') document.documentElement.requestFullscreen?.();
 });
