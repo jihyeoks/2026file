@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>p-quad Excess Kurtosis — Triangular Lattice</title>
+  <style>
+    :root{
+      --ink:#111;
+      --edge:#8389a4;
+      --node-stroke:#555;
+      --cream:#fffbe6;
+      --font: Arial, Helvetica, sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:white;color:var(--ink);font-family:var(--font);overflow:hidden}
+    .slide{width:100vw;height:100vh;position:relative;background:white}
+    .title{position:absolute;top:8px;left:0;width:100%;text-align:center;font-size:31px;line-height:1.08;font-weight:400;letter-spacing:.2px;z-index:2}
+    svg#graph{position:absolute;left:50px;top:104px;width:940px;height:770px;overflow:visible}
+    .edge{stroke:var(--edge);stroke-width:2.15;opacity:.95;stroke-linecap:round}
+    .node{cursor:pointer}
+    .node circle{stroke:var(--node-stroke);stroke-width:3.1;fill:var(--cream)}
+    .node text{font-size:16px;font-weight:400;text-anchor:middle;dominant-baseline:central;fill:#111;pointer-events:none}
+    .node.selected circle{stroke:#333;stroke-width:3.8}
+    .node:hover circle{stroke:#111;stroke-width:4.2}
+    #colorbar{position:absolute;right:122px;top:112px;width:95px;height:780px;overflow:visible}
+    .tick text{font-size:24px;fill:#111}
+    .tick line{stroke:#111;stroke-width:2.3}
+    .bar-label{position:absolute;right:10px;top:430px;transform:rotate(-90deg);font-size:28px;font-weight:400}
+    .mini-controls{position:absolute;left:18px;top:14px;display:flex;gap:8px;opacity:.05;transition:.2s;z-index:10}
+    .mini-controls:hover{opacity:1}
+    button{border:1px solid #ddd;background:white;border-radius:999px;padding:8px 12px;font-size:13px;cursor:pointer}
+    button.active{background:#111;color:white}
+    .hint{position:absolute;left:18px;bottom:14px;color:#777;font-size:13px;opacity:0;transition:.2s}
+    .slide:hover .hint{opacity:1}
+  </style>
+</head>
+<body>
+  <main class="slide">
+    <div class="mini-controls">
+      <button class="q active" data-q="p">p-quad</button>
+      <button class="q" data-q="x">x-quad</button>
+      <button id="centerBtn">center 25</button>
+    </div>
+
+    <div class="title" id="title">
+      p-quad Excess Kurtosis<br>
+      subtracted at center mode 25<br>
+      minkurtotis = -1.193
+    </div>
+
+    <svg id="graph" viewBox="0 0 940 770"></svg>
+
+    <svg id="colorbar" viewBox="0 0 95 780">
+      <defs>
+        <linearGradient id="barGrad" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#fffbe6"/>
+          <stop offset="28%" stop-color="#d8dbc7"/>
+          <stop offset="58%" stop-color="#879883"/>
+          <stop offset="82%" stop-color="#607890"/>
+          <stop offset="100%" stop-color="#49678f"/>
+        </linearGradient>
+      </defs>
+      <path d="M20 0 H70 V700 L45 760 L20 700 Z" fill="url(#barGrad)" stroke="#111" stroke-width="2.5"/>
+      <g id="ticks"></g>
+    </svg>
+    <div class="bar-label">Excess Kurtosis</div>
+    <div class="hint">노드를 클릭하면 subtraction mode가 바뀝니다. F: fullscreen</div>
+  </main>
+
+<script>
+// This is a direct JS translation of the Python function triangular_lattice_adjacency(n_rows).
+function triangular_lattice_adjacency(n_rows) {
+  const idx = {};
+  let node = 0;
+
+  for (let r = 0; r < n_rows; r++) {
+    for (let c = 0; c < r + 1; c++) {
+      idx[`${r},${c}`] = node;
+      node += 1;
+    }
+  }
+
+  const m = node;
+  const Adj = Array.from({ length: m }, () => Array(m).fill(0));
+
+  function add_edge(a, b) {
+    const i = idx[`${a[0]},${a[1]}`];
+    const j = idx[`${b[0]},${b[1]}`];
+    Adj[i][j] = 1;
+    Adj[j][i] = 1;
+  }
+
+  for (let r = 0; r < n_rows; r++) {
+    for (let c = 0; c < r + 1; c++) {
+      if (c < r) add_edge([r, c], [r, c + 1]);
+      if (r < n_rows - 1) {
+        add_edge([r, c], [r + 1, c]);
+        add_edge([r, c], [r + 1, c + 1]);
+      }
+    }
+  }
+
+  const pos = {};
+  for (const key of Object.keys(idx)) {
+    const [r, c] = key.split(',').map(Number);
+    const i = idx[key];
+    const x = c - r / 2;
+    const y = -Math.sqrt(3) / 2 * r;
+    pos[i] = [x, y];
+  }
+
+  return { Adj, pos, idx, m };
+}
+
+const n_rows = 12;
+const { Adj, pos: rawPos, idx, m } = triangular_lattice_adjacency(n_rows);
+const centerNode = idx['6,3']; // zero-based index 24, label 25
+let selected = centerNode;
+let quad = 'p';
+const squeezing_dB = 10;
+const s = Math.pow(10, squeezing_dB / 10);
+
+function svgLayout(rawPos) {
+  const points = Object.values(rawPos);
+  const xs = points.map(p => p[0]);
+  const ys = points.map(p => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const out = {};
+
+  for (const [key, p] of Object.entries(rawPos)) {
+    const x = 58 + (p[0] - minX) / (maxX - minX) * 820;
+    const y = 92 + (maxY - p[1]) / (maxY - minY) * 610;
+    out[Number(key)] = [x, y];
+  }
+  return out;
+}
+const pos = svgLayout(rawPos);
+
+// V = G V0 G^T for G = [[I,0],[Adj,I]], V0 = diag(sI, 1/s I).
+// We do not need to build the full V matrix. We only need diagonal variances and
+// the two selected columns of M = V - I to compute A^- diagonal.
+function M_entry(row, col) {
+  const isRowX = row < m;
+  const isColX = col < m;
+  const r = isRowX ? row : row - m;
+  const c = isColX ? col : col - m;
+
+  if (isRowX && isColX) {
+    return r === c ? s - 1 : 0;
+  }
+
+  if (isRowX && !isColX) {
+    return s * Adj[r][c];
+  }
+
+  if (!isRowX && isColX) {
+    return s * Adj[r][c];
+  }
+
+  // p-p block: s * Adj^2 + (1/s - 1) I
+  let adj2 = 0;
+  for (let k = 0; k < m; k++) adj2 += Adj[r][k] * Adj[k][c];
+  return s * adj2 + (r === c ? 1 / s - 1 : 0);
+}
+
+function V_diag(index) {
+  if (index < m) return s;
+  const node = index - m;
+  let degree = 0;
+  for (let k = 0; k < m; k++) degree += Adj[node][k];
+  return s * degree + 1 / s;
+}
+
+function graphDistances(start) {
+  const dist = Array(m).fill(Infinity);
+  const queue = [start];
+  dist[start] = 0;
+  while (queue.length > 0) {
+    const v = queue.shift();
+    for (let u = 0; u < m; u++) {
+      if (Adj[v][u] === 1 && dist[u] > dist[v] + 1) {
+        dist[u] = dist[v] + 1;
+        queue.push(u);
+      }
+    }
+  }
+  return dist;
+}
+
+function excessKurtosisFromVarAndA(varQ, Aii) {
+  // For W^-(r) = 1/2 [r^T V^{-1} A^- V^{-1} r - Tr(V^{-1}A^-) + 2] W_G(r),
+  // <Q^2> = Var(Q) + Aii and <Q^4> = 3 Var(Q)^2 + 6 Var(Q) Aii.
+  const second = varQ + Aii;
+  const fourth = 3 * varQ * varQ + 6 * varQ * Aii;
+  return fourth / (second * second) - 3;
+}
+
+function computeKurtosisForSelectedNode() {
+  const xCol = selected;
+  const pCol = m + selected;
+
+  // Π_g = |x_s><x_s| + |p_s><p_s| for single real-mode subtraction.
+  // A^- = 2 M Π_g M / Tr(M Π_g)
+  const denom = M_entry(xCol, xCol) + M_entry(pCol, pCol);
+
+  const Kx = Array(m).fill(0);
+  const Kp = Array(m).fill(0);
+
+  for (let node = 0; node < m; node++) {
+    const xIndex = node;
+    const pIndex = m + node;
+
+    const A_xx = 2 * (
+      M_entry(xIndex, xCol) * M_entry(xIndex, xCol) +
+      M_entry(xIndex, pCol) * M_entry(xIndex, pCol)
+    ) / denom;
+
+    const A_pp = 2 * (
+      M_entry(pIndex, xCol) * M_entry(pIndex, xCol) +
+      M_entry(pIndex, pCol) * M_entry(pIndex, pCol)
+    ) / denom;
+
+    Kx[node] = excessKurtosisFromVarAndA(V_diag(xIndex), A_xx);
+    Kp[node] = excessKurtosisFromVarAndA(V_diag(pIndex), A_pp);
+
+    // Remove tiny floating-point residue only. This is not a two-hop hack.
+    if (Math.abs(Kx[node]) < 1e-12) Kx[node] = 0;
+    if (Math.abs(Kp[node]) < 1e-12) Kp[node] = 0;
+  }
+
+  return { Kx, Kp, Kmin: Kx.map((x, i) => Math.min(x, Kp[i])), dist: graphDistances(selected) };
+}
+
+function valueFor(result, node) {
+  if (quad === 'x') return result.Kx[node];
+  return result.Kp[node];
+}
+
+function colorFromK(k) {
+  // Same idea as matplotlib vmin=-0.3, vmax=0, extend='min'.
+  const t = Math.max(0, Math.min(1, (-k) / 0.30));
+  const stops = [
+    [255, 251, 230],
+    [216, 219, 199],
+    [135, 152, 131],
+    [96, 120, 144],
+    [73, 103, 143]
+  ];
+  const x = t * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(x));
+  const f = x - i;
+  const a = stops[i], b = stops[i + 1];
+  const rgb = a.map((v, j) => Math.round(v + (b[j] - v) * f));
+  return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+}
+
+function selectedLabel() {
+  return selected === centerNode ? 'center mode 25' : `mode ${selected + 1}`;
+}
+
+function renderGraph() {
+  const result = computeKurtosisForSelectedNode();
+  const values = Array.from({ length: m }, (_, i) => valueFor(result, i));
+  const minK = Math.min(...values);
+
+  document.getElementById('title').innerHTML =
+    `${quad}-quad Excess Kurtosis<br>` +
+    `subtracted at ${selectedLabel()}<br>` +
+    `minkurtotis = ${minK.toFixed(3)}`;
+
+  const svg = document.getElementById('graph');
+  svg.innerHTML = '';
+
+  for (let i = 0; i < m; i++) {
+    for (let j = i + 1; j < m; j++) {
+      if (Adj[i][j] === 1) {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', pos[i][0]);
+        line.setAttribute('y1', pos[i][1]);
+        line.setAttribute('x2', pos[j][0]);
+        line.setAttribute('y2', pos[j][1]);
+        line.setAttribute('class', 'edge');
+        svg.appendChild(line);
+      }
+    }
+  }
+
+  for (let i = 0; i < m; i++) {
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'node' + (i === selected ? ' selected' : ''));
+    group.setAttribute('transform', `translate(${pos[i][0]},${pos[i][1]})`);
+    group.onclick = () => { selected = i; renderGraph(); };
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('r', 19.3);
+    circle.style.fill = colorFromK(values[i]);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.textContent = i + 1;
+
+    group.appendChild(circle);
+    group.appendChild(text);
+    svg.appendChild(group);
+  }
+
+  document.querySelectorAll('.q').forEach(button => {
+    button.classList.toggle('active', button.dataset.q === quad);
+  });
+}
+
+function renderTicks() {
+  const tickGroup = document.getElementById('ticks');
+  const ticks = [
+    ['0', 0], ['-0.05', 126], ['-0.1', 252], ['-0.15', 378],
+    ['-0.2', 504], ['-0.25', 630], ['< -0.3', 760]
+  ];
+  for (const [label, y] of ticks) {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'tick');
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', 70);
+    line.setAttribute('x2', 84);
+    line.setAttribute('y1', y);
+    line.setAttribute('y2', y);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', 92);
+    text.setAttribute('y', y + 8);
+    text.textContent = label;
+
+    g.appendChild(line);
+    g.appendChild(text);
+    tickGroup.appendChild(g);
+  }
+}
+
+document.querySelectorAll('.q').forEach(button => {
+  button.onclick = () => { quad = button.dataset.q; renderGraph(); };
+});
+document.getElementById('centerBtn').onclick = () => { selected = centerNode; renderGraph(); };
+document.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'f') document.documentElement.requestFullscreen?.();
+});
+
+renderTicks();
+renderGraph();
+</script>
+</body>
+</html>
