@@ -1,0 +1,59 @@
+0. Journal Search하기 (이번주는 Nature!!!!)
+
+1. 교수님께서 말씀하신 simulation해보기
+-> 먼저 이상적인 상태에 대해서 논문재현(skeleton code짜보기)
+-> 이후 잘 되는지 확인 후 이상적인 V -> mixed state로 바꿔서도 해보기
+-> 이후 잘 되는지 확인후 kurtosis -> A matrix로 바꿔서도 해보기
+(여기까지 함)
+
+-> 이후 교수님 ppt, 동경대 논문, 노찬박사님 논문을 읽고, 주신 코드 좀 봐보고 & homodyne measure관련 윤영도 선배께 질문좀 해서..(주신 코드 보고가면 좋을듯)
+-> 이후 x measurement homodynde 구현 관련 skeleton code짜보기..(랩미팅때 검토받아도 좋다-> 혹은 논문에 대해서 읽은게 맞는지 이해관련 발표)
+-> 그렇게 구현해보면 될듯 nongausinnty가 모이는지 안 모이는지
+(이걸 해야하는데 그전 공부를 먼저)
+
+—그전 공부 및 정리
+(관련 reference 보고 있는데 애매하다…-> 수식 정리해보고, 다음주에 정리)
++ A matrix에 off diagonal들의 의미를 다시 정리해보고 수식 정리 (+ 분모 없애서 linear, linear이 아닌 차이도 봐봐야함-> 교수님 주신 2026.0330파일에 있다.)
++ Canonical graph state에 대해서도 다시 정리해서 CZ와 passive linear optics의 차이도 보기
+
+2. Timing control 파일 분석
+(관련 파일 보고 있는데 모르겠다..-> 다음주에 질문)
+
+
+
+3. Castech and Semrock 여쭈어봐서 모으기
+-> 모았다.. Castech 주문, semrock 주문(혹시나 필터는 필요한게 없는지 여쭈어보기)
+-> 관련 견적해서 교수님께 여쭈어보기(여쭈어봄)
+-> Semrock은 5월 말에 올 예정이고, Castech은 견적 2개로 나눠서 1550을 시킴(400은 보류)
+(물품 오는거 대기중)
+
+
+4. Pbs 설치후 fiber beam으로 교체할 예정 
+(Spectrometer 파장 얼라인? 없을때 빛이 안들어오는지? 등등 전처리 후처리 과정 물어보기)
+(실제로 그리면 output power가 10mW일때 똑같이 나온다.. 다시 파워 재보기)-> 얼추 비슷하네요
+(30mW로 바꿔서 다시 재보자..)
+-> 설치 완료
+-> 이후 PBS설치후 (빔 2개로 나누는 방법이 있을까 했는데 잘 안되서.. 그냥 합쳤다..ㅜ)
+input 크기 재보기(굳이 reference빔을 겹치게 안되면 좋으니 해보기)
+
+(이번주 금토일에 해보자)
+
+
+
+Cf) Pulse shaper쪽 얼라인이 이미 좀틀어진거 같다고 하신다..ㅜ(나중에 고칠 때 시간내서 봐두면 얼라인할때 도움 많이될꺼 같다.)
+
+
+——-------------------------NOT Today' s to do list——----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+5. 양자광학, 양자역학, 고전역학 복습
+(시험이 6/15,16,17이제 2주 남아서 슬슬 공부 시작해야함)
+
+추후) Red pitaya 관련해서 pid.py 2f demodulation locking이 되는지( -임성연 선배님 마하젠더 간섭계 만들면 실험해보자 or 인턴이 오면 같이)
+￼
+
+기존 input(in1-detector signal) , output _direct(out1-pzt signal), setpoint( 0degree locking)￼
+아니면 
+기존 input(in1-detector signal), f modulation(1000Hz 정도?), quadrature_factor(1배), gain(3정도) amplitude (0.001V?)
+이후 pid(90도 locking)
+
+-> 이걸 f로 locking 후 2f modulation(0 degree locking)
+(sin 파형의 0-degree lock에서는 2f demod가 DC offset, drift, 1f leakage에 덜 민감해서 안정적일 수 있다.)
